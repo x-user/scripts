@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# Copyright (C) 2023  Pavel Lymarev
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# SPDX-License-Identifier: GPL-3.0-only
+
+set -eEu -o pipefail
+IFS=$'\n\t'
+trap 'echo "$0: Error on line $LINENO: $BASH_COMMAND" >&2' ERR
+
+main() {
+  self="$(realpath "$0")"
+  enc="$(printf '%q' "$(dirname "$self")"/enc)"
+
+  if ! readarray -t mounts < /proc/mounts 2> >(err); then
+    err 'failed to read /proc/mounts'
+  else
+    mnt=''
+    for m in "${mounts[@]}"; do
+      # shellcheck disable=SC2046
+      set -- $(echo "$m" | awk -v OFS='\t' '{ print $1, $2 }')
+
+      c1="${1/\\040/ }"
+      c2="${2/\\040/ }"
+      if [[ "$enc" = "$(realpath "${c1#cryfs@}" 2> >(err))" ]]; then
+        mnt="$c2"; break
+      fi
+    done
+
+    if [ -z "$mnt" ]; then
+      err 'filesystem not mounted'
+    else
+      cryfs-unmount "$mnt" 2> >(err) || die 'failed to unmount filesystem'
+    fi
+  fi
+}
+
+die() { err "$@"; exit 1; }
+
+# shellcheck disable=SC2120
+err() {
+  if [ -t 0 ]; then
+    local IFS=' '
+    printf "\e[91m%s\e[m" "$@" >&2
+  elif [ "$#" -gt 0 ]; then
+    cat | sed $'s,.*,\e[91m&\e[m,' >&2
+  fi
+}
+
+main "$@"
