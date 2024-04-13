@@ -23,33 +23,34 @@ trap 'echo "$0: error on line $LINENO: $BASH_COMMAND" >&2' ERR
 
 main() {
   self="$(realpath "$0")"
-  enc="$(printf '%q' "$(dirname "$self")"/enc)"
+  ecdr="$(printf '%q' "$(dirname "$self")"/enc)"
 
   if ! readarray -t mounts < /proc/mounts 2> >(err); then
     err 'failed to read /proc/mounts.'
   else
-    mnt=''
-    for m in "${mounts[@]}"; do
+    mtpt=''
+    for mtinf in "${mounts[@]}"; do
       # shellcheck disable=SC2046
-      set -- $(echo "$m" | awk -v OFS='\t' '{ print $1, $2 }')
+      set -- $(echo "$mtinf" | awk -v OFS='\t' '{ print $1, $2 }')
 
-      c1="${1/\\040/ }"
-      c2="${2/\\040/ }"
-      if [[ "$enc" = "$(realpath "${c1#cryfs@}" 2> >(err))" ]]; then
-        mnt="$c2"; break
+      dev="${1/\\040/ }"
+      dir="${2/\\040/ }"
+
+      if [[ "$ecdr" = "$(realpath "${dev#cryfs@}" 2> >(err))" ]]; then
+        mtpt="$dir"; break
       fi
     done
 
-    if [ -n "$mnt" ]; then
-      err "already mounted at $mnt"
+    if [ -n "$mtpt" ]; then
+      err "already mounted at $mtpt"
     else
-      mnt="$(mktemp -dt data-XXXX)"
-      if ! cryfs "$enc" "$mnt" 2> >(err); then
+      mtpt="$(mktemp -dt data-XXXX)"
+      if ! cryfs "$ecdr" "$mtpt" 2> >(err); then
         die 'failed to mount filesystem'
       fi
     fi
 
-    xdg-open "$mnt" 2> >(err) || die "Failed to open $mnt in filemanager"
+    xdg-open "$mtpt" 2> >(err) || die "Failed to open $mtpt in filemanager"
   fi
 }
 

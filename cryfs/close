@@ -23,27 +23,28 @@ trap 'echo "$0: Error on line $LINENO: $BASH_COMMAND" >&2' ERR
 
 main() {
   self="$(realpath "$0")"
-  enc="$(printf '%q' "$(dirname "$self")"/enc)"
+  ecdr="$(printf '%q' "$(dirname "$self")"/enc)"
 
   if ! readarray -t mounts < /proc/mounts 2> >(err); then
     err 'failed to read /proc/mounts'
   else
-    mnt=''
-    for m in "${mounts[@]}"; do
+    mtpt=''
+    for mtinf in "${mounts[@]}"; do
       # shellcheck disable=SC2046
-      set -- $(echo "$m" | awk -v OFS='\t' '{ print $1, $2 }')
+      set -- $(echo "$mtinf" | awk -v OFS='\t' '{ print $1, $2 }')
 
-      c1="${1/\\040/ }"
-      c2="${2/\\040/ }"
-      if [[ "$enc" = "$(realpath "${c1#cryfs@}" 2> >(err))" ]]; then
-        mnt="$c2"; break
+      dev="${1/\\040/ }"
+      dir="${2/\\040/ }"
+
+      if [[ "$ecdr" = "$(realpath "${dev#cryfs@}" 2> >(err))" ]]; then
+        mtpt="$dir"; break
       fi
     done
 
-    if [ -z "$mnt" ]; then
+    if [ -z "$mtpt" ]; then
       err 'filesystem not mounted'
     else
-      cryfs-unmount "$mnt" 2> >(err) || die 'failed to unmount filesystem'
+      cryfs-unmount "$mtpt" 2> >(err) || die 'failed to unmount filesystem'
     fi
   fi
 }
